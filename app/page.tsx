@@ -18,6 +18,9 @@ export default function Home() {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const [showEscHint, setShowEscHint] = useState(false);
+  const escHintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Convex hooks
   const userDocument = useQuery(
     api.documents.getUserDocument,
@@ -114,8 +117,41 @@ export default function Home() {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
+      // Ensure escHintTimeout is also cleared on unmount
+      if (escHintTimeoutRef.current) {
+        clearTimeout(escHintTimeoutRef.current);
+      }
     };
   }, [isWriting, handleKeyDown]);
+
+  // Effect to manage the visibility of the "Esc" hint with a delay
+  useEffect(() => {
+    if (isWriting) {
+      setShowEscHint(false); // Hide immediately when entering writing mode
+      if (escHintTimeoutRef.current) {
+        clearTimeout(escHintTimeoutRef.current);
+      }
+      escHintTimeoutRef.current = setTimeout(() => {
+        // Only show if still in writing mode after delay
+        if (isWriting) {
+          setShowEscHint(true);
+        }
+      }, 3500);
+    } else {
+      setShowEscHint(false); // Hide if not in writing mode
+      if (escHintTimeoutRef.current) {
+        clearTimeout(escHintTimeoutRef.current);
+        escHintTimeoutRef.current = null;
+      }
+    }
+
+    // Cleanup timeout when isWriting changes or component unmounts
+    return () => {
+      if (escHintTimeoutRef.current) {
+        clearTimeout(escHintTimeoutRef.current);
+      }
+    };
+  }, [isWriting]);
 
   // Show loading while session is loading or document is being fetched/created
   if (status === "loading" || (session && !isDocumentLoaded)) {
@@ -158,7 +194,7 @@ export default function Home() {
         />
 
         {/* Escape key hint */}
-        {isWriting && (
+        {showEscHint && (
           <div className="fixed bottom-6 right-6 text-xs text-muted-foreground bg-background/80 backdrop-blur-sm px-3 py-2 rounded-md border animate-in fade-in duration-300">
             Press{" "}
             <kbd className="px-1 py-0.5 bg-muted rounded text-foreground font-mono text-xs">
